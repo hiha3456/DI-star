@@ -159,7 +159,7 @@ league:
   pfsp_train_bot: False  # use pfsp in training against bots
   bot_probs:  [0, 0, 0, 1.0, 0, 0, 0, 0,0, 0, 0]  # probabilities for each bot level
   save_initial_snapshot: False  # whether to snapshot the initial main player as historical player
-  map_names: ['KairosJunction']  # one of ['KairosJunction', 'KingsCove', 'NewRepugnancy'], random mean a random map from these three
+  map_names: ['KingsCove']  # one of ['KairosJunction', 'KingsCove', 'NewRepugnancy'], random mean a random map from these three
   map_id_weights: [ 1 ]  # weights used for map sampling.
   active_players:
     checkpoint_path: [ *model_path ] 

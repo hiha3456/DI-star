@@ -403,7 +403,7 @@ class League(ABC):
         elif job_type == 'ladder':
             branch, job_info = self._get_ladder_job_info()
         
-        map_ids = self.cfg.get('map_names', ['KairosJunction'])
+        map_ids = self.cfg.get('map_names', ['KingsCove'])
         map_id_weights = self.cfg.get('map_id_weights', [1])
         map_id = random.choices(map_ids, weights=map_id_weights, k=1)[0]
         job_info['env_info']['map_name'] = map_id

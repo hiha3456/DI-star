@@ -112,7 +112,7 @@ class SC2Env(object):
         self._num_agents = sum(1 for p in players if isinstance(p, Agent))
         self._players = players
 
-        self._ori_map_name = self._cfg.get('map_name', 'KairosJunction')
+        self._ori_map_name = self._cfg.get('map_name', 'KingsCove')
         if len(self._ori_map_name.split('_')) == 2:
             self._ori_map_name, self._born_location = self._ori_map_name.split('_')
         else:

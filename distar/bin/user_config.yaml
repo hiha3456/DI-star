@@ -31,7 +31,7 @@ actor:
   teacher_model_paths:  
     haha: 'haha.pth.tar'  # key is one of teacher player ids
 env:
-  map_name: 'random'  # one of ['KairosJunction', 'KingsCove', 'NewRepugnancy'], random mean a random map from these three
+  map_name: 'KingsCove'  # one of ['KairosJunction', 'KingsCove', 'NewRepugnancy'], random mean a random map from these three
   player_ids: ['agent1', 'bot10']  # player ids shown in game and replay, bot0 - bot10 means built-in bots
   races: ['zerg', 'zerg']  # player races
   map_size_resolutions: [True, True] # if True, ignore minimap_resolutions

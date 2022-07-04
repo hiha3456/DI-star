@@ -8,7 +8,7 @@ env:
     random_seed: 0
     realtime: False  # realtime mode, incompatible with action_delays
     crop_map_to_playable_area: True
-    map_name: 'KairosJunction'
+    map_name: 'KingsCove'
     obs_stat_type: 'replay_last'  # self_online, replay_online, replay_last
     pseudo_reward_type: 'global'  # global, immediate
     pseudo_reward_prob: 0.25

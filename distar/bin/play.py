@@ -2,6 +2,7 @@ import argparse
 import os
 import shutil
 import torch
+import random
 
 from distar.actor import Actor
 import warnings
@@ -25,6 +26,7 @@ def get_args():
 
 
 if __name__ == '__main__':
+    random.seed(233)
     if os.path.exists(r'C:\Program Files (x86)\StarCraft II'):
         sc2path = r'C:\Program Files (x86)\StarCraft II'
     elif os.path.exists('/Applications/StarCraft II'):

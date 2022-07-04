@@ -16,8 +16,11 @@ from distar.ctools.worker.actor.actor_comm import ActorComm
 from distar.ctools.utils.dist_helper import dist_init
 from distar.envs.env import SC2Env
 from distar.ctools.worker.league.player import FRAC_ID
+from dizoo.distar.envs import get_fake_env_reset_data
+import copy
 
 default_config = read_config(os.path.join(os.path.dirname(__file__), 'actor_default_config.yaml'))
+torch.set_printoptions(profile="full")
 
 
 class Actor(object):
@@ -74,11 +77,12 @@ class Actor(object):
                         self.models[player_id] = agent.model
                     else:
                         agent.model = self.models[player_id]
-            if len(map_names) == 1:
-                self._whole_cfg.env.map_name = map_names[0]
-            if len(map_names) == 2:
-                if not(map_names[0] == 'random' and map_names[1] != 'random'):
-                    self._whole_cfg.env.map_name = 'NewRepugnancy'
+            # print(map_names)
+            # if len(map_names) == 1:
+            #     self._whole_cfg.env.map_name = map_names[0]
+            # if len(map_names) == 2:
+            #     if not(map_names[0] == 'random' and map_names[1] != 'random'):
+            self._whole_cfg.env.map_name = 'KingsCove'
             if self._job_type == 'train_test':
                 teacher_models = {}
                 for idx, teacher_player_id in enumerate(self._cfg.teacher_player_ids):
@@ -129,15 +133,24 @@ class Actor(object):
                 variable_record.register_var('update_model_time')
         with torch.no_grad():
             episode_count = 0
-            while episode_count < self._cfg.episode_num:
+            for _ in range(1):
                 try:
                     game_start = time.time()
                     game_iters = 0
-                    observations, game_info, map_name = self._env.reset()
-                    for idx in observations.keys():
-                        self.agents[idx].env_id = env_id
-                        race = self._whole_cfg.env.races[idx]
-                        self.agents[idx].reset(map_name, race, game_info[idx], observations[idx])
+                    # observations, game_info, map_name = self._env.reset()
+                    data = get_fake_env_reset_data()
+                    print(data.keys())
+                    # exit(0)
+                    observations = copy.deepcopy(data)
+                    observations.pop('map_name', None)
+                    observations.pop('game_info', None)
+                    observations.pop('map_size', None)
+                    observations = {0: observations}
+
+                    # for idx in observations.keys():
+                    self.agents[0].env_id = env_id
+                    race = self._whole_cfg.env.races[0]
+                    self.agents[0].reset(data['map_name'], race, data['game_info'], observations[0])
 
                     while True:  # one episode loop
                         if pipe_c is not None and pipe_c.poll():
@@ -160,15 +173,12 @@ class Actor(object):
                             actions[player_index] = self.agents[player_index].step(obs)
                             agent_count += 1
                         agent_time = time.time() - agent_start_time
-
+                        print(actions)
+                        print(observations)
+                        exit(0)
                         # env step
                         env_start_time = time.time()
                         next_observations, reward, done = self._env.step(actions)
-                        # print('------------------------------------------------------------------------------------')
-                        # print('game_iters:',game_iters)
-                        # print('actions:',actions)
-                        # print('reward:',reward)
-                        # print("observations:",observations)
                         env_time = time.time() - env_start_time
                         next_players_obs = next_observations
                         # collect data
