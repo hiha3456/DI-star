@@ -12,21 +12,60 @@ import portpicker
 
 from distar.ctools.utils.log_helper import TextLogger
 from distar.ctools.utils import LockContextType, LockContext
+from time import time
+from tensorboardX import SummaryWriter
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 
 class Worker(object):
-    def __init__(self, worker_index) -> None:
+    def __init__(self, worker_index, token) -> None:
         self._lock = LockContext(type_=LockContextType.THREAD_LOCK)
         self._buffer = defaultdict(partial(deque, maxlen=256))
         self.worker_index = worker_index
+        
+        self._traj_num = 0
+        self._last_time = None
+        self._total_recv_time = 0
+        self._pre_collect_finished = False
 
-    def deal_with_push(self, request_info):
+        self.tb_path = os.path.join(os.getcwd(), 'experiments', 'MP0traj')
+        if token == "MP0traj":
+            self._writer = SummaryWriter(self.tb_path)
+
+    def deal_with_push(self, request_info):        
         token = request_info.pop('token')
         self._buffer[token].append(request_info)
         print(f'worker index: {self.worker_index}, push to token: {token} buffer size: {len(self._buffer[token])}, {request_info}')
+        
+        if token == "MP0traj":
+            if self._last_time is None:
+                self._last_time = time()
+            
+            if self._total_recv_time >= 10 and self._pre_collect_finished is False:
+                self._pre_collect_finished = True
+                self._total_recv_time = 0
+            
+            this_time = time()
+            current_time = this_time - self._last_time
+            self._total_recv_time += current_time
+            self._last_time = this_time
+
+            if self._pre_collect_finished:
+                self._traj_num += 1
+                print(
+                    "[Coordinator] recieve {} traj in total, current recv speed is {} traj/s, total recv speed is {} traj/s".format(
+                        self._traj_num, 1 / current_time,
+                        self._traj_num / self._total_recv_time
+                    )
+                )
+                self._writer.add_scalar("current_recv_speed/traj_s", 1 / current_time, self._traj_num)
+                self._writer.add_scalar("total_recv_speed/traj_s", self._traj_num / self._total_recv_time, self._traj_num)
+            else:
+                print('we are now pre collecting')
+                print(self._total_recv_time)
+
         return True
     
     def deal_with_pull(self, request_info):
@@ -53,7 +92,7 @@ class Worker(object):
     
 
 def run_worker(token, ip, port, worker_index):
-    worker = Worker(worker_index)
+    worker = Worker(worker_index, token)
     worker_app = create_worker_app(worker)
     print(f'run worker for token: {token} at {ip}: {port}')
     worker_app.run(host=ip, port=port, debug=False, use_reloader=False)
