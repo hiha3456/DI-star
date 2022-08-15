@@ -127,28 +127,29 @@ class Adapter(object):
                 print(f'[push ERROR], can not connect to {http_addr} retrying!', e)
                 time.sleep(10)
                 continue
-
-            try:
-                s.settimeout(20)
-                c, addr = s.accept()
-            except socket.timeout as e:
-                # print('[push ERROR] wait accept time out', e)
-                s.close()
-                continue
-            try:
-                # t = time.time()
-                data = self._cache_data[token].popleft()
-                data_len = len(data)
-                send_len = c.send(data_len.to_bytes(length=BYTES_LENGTH, byteorder='big', signed=False))
-                if send_len == 0:
-                    raise RuntimeError("socket connection broken")
-                c.sendall(data)
-                # print(f'size: {data_len/ 1000000:.2f}M, push comm time: {time.time() - t:.2f}', flush=True)
-            except Exception as e:
-                print('[push socket ERROR jump to next data]', e, flush=True)
-            finally:
-                c.close()
-                s.close()  
+            data = self._cache_data[token].popleft()
+            del data
+            # try:
+            #     s.settimeout(20)
+            #     c, addr = s.accept()
+            # except socket.timeout as e:
+            #     # print('[push ERROR] wait accept time out', e)
+            #     s.close()
+            #     continue
+            # try:
+            #     # t = time.time()
+            #     data = self._cache_data[token].popleft()
+            #     data_len = len(data)
+            #     send_len = c.send(data_len.to_bytes(length=BYTES_LENGTH, byteorder='big', signed=False))
+            #     if send_len == 0:
+            #         raise RuntimeError("socket connection broken")
+            #     c.sendall(data)
+            #     # print(f'size: {data_len/ 1000000:.2f}M, push comm time: {time.time() - t:.2f}', flush=True)
+            # except Exception as e:
+            #     print('[push socket ERROR jump to next data]', e, flush=True)
+            # finally:
+            #     c.close()
+            #     s.close()  
 
     def pull(self, token='default', fs_type='torch', compress=True, sleep_time=1, timeout=None, size=None, worker_num=None):
         if worker_num is not None and len(self._worker_addr[token]) == 0:

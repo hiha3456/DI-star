@@ -148,14 +148,14 @@ if __name__ == '__main__':
         p_league = mp_context.Process(target=league_run, args=(config, args))
         p_league.start()
         time.sleep(10)
-        p_learner = mp_context.Process(target=learner_run, args=(config, args))
-        p_learner.start()
+        # p_learner = mp_context.Process(target=learner_run, args=(config, args))
+        # p_learner.start()
         time.sleep(10)
         actor_run(config, args)
     elif args.type == 'coordinator':
         coordinator_run(config, args)
-    elif args.type == 'learner':
-        learner_run(config, args)
+    # elif args.type == 'learner':
+    #     learner_run(config, args)
     elif args.type == 'league':
         league_run(config, args)
     elif args.type == 'actor':

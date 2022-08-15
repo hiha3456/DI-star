@@ -18,6 +18,7 @@ from tensorboardX import SummaryWriter
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
+PRE_RECV_TIME = 10 * 60
 
 class Worker(object):
     def __init__(self, worker_index, token) -> None:
@@ -36,14 +37,14 @@ class Worker(object):
 
     def deal_with_push(self, request_info):        
         token = request_info.pop('token')
-        self._buffer[token].append(request_info)
+        # self._buffer[token].append(request_info)
         print(f'worker index: {self.worker_index}, push to token: {token} buffer size: {len(self._buffer[token])}, {request_info}')
         
         if token == "MP0traj":
             if self._last_time is None:
                 self._last_time = time()
             
-            if self._total_recv_time >= 10 and self._pre_collect_finished is False:
+            if self._total_recv_time >= PRE_RECV_TIME and self._pre_collect_finished is False:
                 self._pre_collect_finished = True
                 self._total_recv_time = 0
             
