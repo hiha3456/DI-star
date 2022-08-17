@@ -72,7 +72,7 @@ class ActorComm:
             result = self._flask_send(request_info, 'league/actor_ask_for_job', to_league=True)
             if result is not None and result['code'] == 0:
                 job = result['info']
-                print(job)
+                print('----------',job,'-------------')
                 self.job = job
                 self.tmp_model_path = {}
                 self.tmp_traj_path = {}

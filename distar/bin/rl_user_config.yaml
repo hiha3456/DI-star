@@ -42,19 +42,19 @@ learner:
   learning_rate: 0.00001
   weight_decay: 0  # weight decay in adam
   var_record_type: 'alphastar'  # log type
-  value_pretrain_iters: 4000  # max step for value pretrain
+  value_pretrain_iters: -1  # max step for value pretrain
   optimizer_warm_up_iters: 100  # warm up adam optimizer without updating model
   reset_env_wait_time: 60  # reset environment in actor after model reloading.
   grad_clip:
     type: 'pytorch_norm'  # gradient clip, one of ['max_norm', 'clip_value', 'none', 'clip_const', 'pytorch_norm', 'momentum_norm'], you can find more info at distar/ctoos/torh_utils/grad_clip.py
     threshold: 1.0  # threshold for gradient clip
   data:
-    buffer_size: 6  # replay buffer size in learner, should be larger than batch_size
-    batch_size: 4
+    buffer_size: 20  # replay buffer size in learner, should be larger than batch_size
+    batch_size: 6
     num_workers: 2  # workers request data from actor 
     use_async_cuda: False  # put data to gpu in an asynchronous way
     data_path_queue_size: 2  # how many data are stored in queue
-    trajectory_length: 16 
+    trajectory_length: 64 
   loss_weights: 
       baseline:  # loss weight for critic
           winloss: 10.0 #10.0
@@ -128,7 +128,7 @@ actor:
   env_num: 3  # enviroment number
   episode_num: 100  # episode number
   print_freq: 1000  # log frequency in actor log
-  traj_len: 16  # trajectory length, should be same as trajectory length in learner
+  traj_len: 64  # trajectory length, should be same as trajectory length in learner
   use_cuda: False  # whether to use gpu in 'train_test' or 'eval_test'
   fake_model: False # if True, skip model loading
   player_ids: ['model1', 'model2']  # player ids used in RL
@@ -181,8 +181,8 @@ league:
     z_path: ['3map.json' ]
   branch_probs:  # every type of main player has multiple job types, this is job types distribution
     MainPlayer: 
-      sp: 0.5   # self play
-      pfsp: 0.5  # prioritized fictitious self play
+      sp: 0.0   # self play
+      pfsp: 1.0  # prioritized fictitious self play
       eval: 0.0  # uniform sample
     ExploiterPlayer:
       pfsp: 0.95  
