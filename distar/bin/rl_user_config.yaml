@@ -51,7 +51,7 @@ learner:
   data:
     buffer_size: 6  # replay buffer size in learner, should be larger than batch_size
     batch_size: 4
-    num_workers: 2  # workers request data from actor 
+    num_workers: 1  # workers request data from actor 
     use_async_cuda: False  # put data to gpu in an asynchronous way
     data_path_queue_size: 2  # how many data are stored in queue
     trajectory_length: 16 

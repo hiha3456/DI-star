@@ -181,6 +181,7 @@ class ReinforcementLoss:
                          total_kl_loss + \
                          action_type_kl_loss + \
                          total_dapo_loss
+        total_loss = total_loss * 0
         loss_info_dict['total_loss'] = total_loss
         return loss_info_dict
 

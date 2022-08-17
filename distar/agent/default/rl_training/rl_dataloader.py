@@ -14,6 +14,8 @@ from typing import Iterable, Callable, Any, Sequence
 import traceback
 import numpy as np
 import requests
+import os
+from tensorboardX import SummaryWriter
 import torch
 import torch.multiprocessing as tm
 import torch.nn.functional as F
@@ -26,6 +28,7 @@ from distar.ctools.torch_utils import sequence_mask
 from distar.ctools.torch_utils import to_device
 from distar.ctools.worker.coordinator.adapter import Adapter
 
+PRE_RECV_TIME = 10 * 60
 
 def flat(data):
     if isinstance(data, torch.Tensor):
@@ -78,6 +81,14 @@ def collate_fn(traj_batch):
 
 def worker_loop(cfg, data_queue, collate_fn, batch_size) -> None:
     player_id = cfg.learner.player_id
+
+    traj_num = 0
+    last_time = time.time()
+    total_recv_time = 0
+    pre_collect_finished = False
+    tb_path = os.path.join(os.getcwd(), 'experiments', 'total_pipeline_{}_traj'.format(player_id))
+    writer = SummaryWriter(tb_path)
+
     adapter = Adapter(cfg=cfg)
     torch.set_num_threads(1)
     worker_num = cfg.communication.adapter_traj_worker_num
@@ -85,6 +96,12 @@ def worker_loop(cfg, data_queue, collate_fn, batch_size) -> None:
     buffer_size = cfg.learner.data.get('buffer_size', batch_size)
     buffer_size = max(buffer_size, cfg.learner.data.batch_size)
     data = adapter.pull(token=player_id + 'traj', fs_type='nppickle', sleep_time=0.5, size=buffer_size, worker_num=worker_num)
+    
+    traj_num += len(data)
+    this_time = time.time()
+    current_time = this_time - last_time
+    total_recv_time += current_time
+    last_time = this_time
 
     data = data + data[:(batch_size // 2 + 1)]
     while True:
@@ -106,7 +123,32 @@ def worker_loop(cfg, data_queue, collate_fn, batch_size) -> None:
         left_num = buffer_size - len(data)
         random.shuffle(data)
         if left_num > 0:
+            if total_recv_time >= PRE_RECV_TIME and pre_collect_finished is False:
+                pre_collect_finished = True
+                total_recv_time = 0
+                traj_num = 0
+            
             new_data = adapter.pull(player_id + 'traj', fs_type='nppickle', sleep_time=0.2, size=left_num, worker_num=worker_num)
+            
+            traj_num += len(new_data)
+            this_time = time.time()
+            current_time = this_time - last_time
+            total_recv_time += current_time
+            last_time = this_time
+
+            if pre_collect_finished:
+                print(
+                    "[Coordinator] recieve {} traj in total, current recv speed is {} traj/s, total recv speed is {} traj/s".format(
+                        traj_num, len(new_data) / current_time,
+                        traj_num / total_recv_time
+                    )
+                )
+                writer.add_scalar("current_recv_speed/traj_s", len(new_data) / current_time, traj_num)
+                writer.add_scalar("total_recv_speed/traj_s", traj_num / total_recv_time, traj_num)
+            else:
+                print('we are now pre collecting')
+                print(total_recv_time)
+
             data = new_data + data + new_data
 
 

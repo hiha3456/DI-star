@@ -99,7 +99,8 @@ class RLLearner(BaseLearner):
                     staleness_std = staleness_std.item()
                     staleness = staleness.item()
                     staleness_max = torch.max(iter_diff).item()
-            model_output = self._model.rl_learner_forward(**data)
+            with torch.no_grad():
+                model_output = self._model.rl_learner_forward(**data)
             if self._whole_cfg.learner.use_dapo:
                 model_output['successive_logit'] = data['successive_logit']
             log_vars = self._loss.compute_loss(model_output)
@@ -112,7 +113,7 @@ class RLLearner(BaseLearner):
 
         with self._timer:
             self._optimizer.zero_grad()
-            loss.backward()
+            # loss.backward()
             if self._use_distributed:
                 self._model.sync_gradients()
             if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
