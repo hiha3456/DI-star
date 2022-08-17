@@ -9,8 +9,10 @@ import torch
 from flask import Flask
 from tensorboardX import SummaryWriter
 from torch.optim.adam import Adam
+import logging
+from tensorboardX import SummaryWriter
 
-from distar.ctools.utils import broadcast
+from distar.ctools.utils import broadcast, EasyTimer
 from distar.ctools.utils.config_helper import read_config, deep_merge_dicts, save_config
 from distar.ctools.worker.learner.base_learner import BaseLearner
 from distar.ctools.worker.learner.learner_comm import LearnerComm
@@ -63,6 +65,12 @@ class RLLearner(BaseLearner):
                         f' world_size:{self.world_size}'
                         f' player_id:{self._player_id}')
         self._remain_value_pretrain_iters = self._whole_cfg.learner.get('value_pretrain_iters', -1)
+        self._train_iter = 0
+        self._timer_all = EasyTimer(self._use_cuda)
+        self._total_train_time = 0
+        self._pre_train_finished = False
+        self.tb_path = os.path.join(os.getcwd(), 'experiments', 'learner_speed', self._player_id)
+        self._writer = SummaryWriter(self.tb_path)
 
     def _setup_model(self):
         self._model = Model(self._whole_cfg, use_value_network=True)
@@ -80,59 +88,79 @@ class RLLearner(BaseLearner):
         self._lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self._optimizer, milestones=[], gamma=1)
 
     def _train(self, data):
-        with self._timer:
-            self.step_value_pretrain()
-            if self._remain_value_pretrain_iters > 0:
-                staleness = 0
+        self.step_value_pretrain()
+        if self._remain_value_pretrain_iters > 0:
+            staleness = 0
+            staleness_std = 0
+            staleness_max = 0
+        else:
+            model_last_iter = data.pop('model_last_iter')
+            model_curr_iter = self.last_iter.val
+            iter_diff = model_curr_iter - model_last_iter
+            if iter_diff.shape[0] == 1:
+                staleness = iter_diff.item()
                 staleness_std = 0
-                staleness_max = 0
+                staleness_max = iter_diff.item()
             else:
-                model_last_iter = data.pop('model_last_iter')
-                model_curr_iter = self.last_iter.val
-                iter_diff = model_curr_iter - model_last_iter
-                if iter_diff.shape[0] == 1:
-                    staleness = iter_diff.item()
-                    staleness_std = 0
-                    staleness_max = iter_diff.item()
-                else:
-                    staleness_std, staleness, = torch.std_mean(iter_diff)
-                    staleness_std = staleness_std.item()
-                    staleness = staleness.item()
-                    staleness_max = torch.max(iter_diff).item()
-            model_output = self._model.rl_learner_forward(**data)
-            if self._whole_cfg.learner.use_dapo:
-                model_output['successive_logit'] = data['successive_logit']
-            log_vars = self._loss.compute_loss(model_output)
-            log_vars['entropy/reward'] = staleness
-            log_vars['entropy/value'] = staleness_std
-            log_vars['entropy/td'] = staleness_max
+                staleness_std, staleness, = torch.std_mean(iter_diff)
+                staleness_std = staleness_std.item()
+                staleness = staleness.item()
+                staleness_max = torch.max(iter_diff).item()
 
-            loss = log_vars['total_loss']
-        self._log_buffer['forward_time'] = self._timer.value
+        with self._timer_all:
+            with self._timer:
+                model_output = self._model.rl_learner_forward(**data)
+                if self._whole_cfg.learner.use_dapo:
+                    model_output['successive_logit'] = data['successive_logit']
+                log_vars = self._loss.compute_loss(model_output)
+                log_vars['entropy/reward'] = staleness
+                log_vars['entropy/value'] = staleness_std
+                log_vars['entropy/td'] = staleness_max
 
-        with self._timer:
-            self._optimizer.zero_grad()
-            loss.backward()
-            if self._use_distributed:
-                self._model.sync_gradients()
-            if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
-                for k, param in self._model.named_parameters():
-                    if param.grad is not None:
-                        self.grad_tb_logger.add_scalar(k, (torch.norm(param.grad)).item(),
-                                                       global_step=self._last_iter.val)
-                        self.model_tb_logger.add_scalar(k, (torch.norm(param.data)).item(),
+                loss = log_vars['total_loss']
+            self._log_buffer['forward_time'] = self._timer.value
+
+            with self._timer:
+                self._optimizer.zero_grad()
+                loss.backward()
+                if self._use_distributed:
+                    self._model.sync_gradients()
+                if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
+                    for k, param in self._model.named_parameters():
+                        if param.grad is not None:
+                            self.grad_tb_logger.add_scalar(k, (torch.norm(param.grad)).item(),
                                                         global_step=self._last_iter.val)
-            gradient = self._grad_clip.apply(self._model.parameters())
-            if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
-                for k, param in self._model.named_parameters():
-                    if param.grad is not None:
-                        self.clip_grad_tb_logger.add_scalar(k, (torch.norm(param.grad)).item(),
-                                                       global_step=self._last_iter.val)
+                            self.model_tb_logger.add_scalar(k, (torch.norm(param.data)).item(),
+                                                            global_step=self._last_iter.val)
+                gradient = self._grad_clip.apply(self._model.parameters())
+                if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
+                    for k, param in self._model.named_parameters():
+                        if param.grad is not None:
+                            self.clip_grad_tb_logger.add_scalar(k, (torch.norm(param.grad)).item(),
+                                                        global_step=self._last_iter.val)
 
-            self._optimizer.step()
+                self._optimizer.step()
+            self._log_buffer['backward_time'] = self._timer.value
             # self._lr_scheduler.step()
+        current_train_time = self._timer_all.value
+        self._train_iter +=1 
+        if self._train_iter >= 100 and self._pre_train_finished is False:
+            self._pre_train_finished = True
+            self._train_iter = 0
+        
+        if self._pre_train_finished:
+            self._total_train_time += current_train_time
+            logging.info(
+                "[Learner] trained {} train_iter in total, current training speed is {} iter/s, total recv speed is {} iter/s".format(
+                    self._train_iter,
+                    1 / current_train_time,
+                    self._train_iter / self._total_train_time
+            ))
+            self._writer.add_scalar("current_train_speed/iter_s", 1 / current_train_time, self._train_iter)
+            self._writer.add_scalar("total_train_speed/iter_s", self._train_iter / self._total_train_time, self._train_iter)
+        else:
+            print('we are now pretraining', self._train_iter)
         self._log_buffer['gradient'] = gradient
-        self._log_buffer['backward_time'] = self._timer.value
         self._log_buffer.update(log_vars)
         if self._update_config_flag:
             self.update_config()
@@ -150,12 +178,8 @@ class RLLearner(BaseLearner):
             self._remain_value_pretrain_iters -= 1
             if self._use_distributed:
                 self._model.module.only_update_baseline = True
-                if self._rank == 0:
-                    self._logger.info(f'only update baseline: {self._model.module.only_update_baseline}')
             else:
                 self._model.only_update_baseline = True
-                if self._rank == 0:
-                    self._logger.info(f'only update baseline: {self._model.only_update_baseline}')
 
         elif self._remain_value_pretrain_iters == 0:
             self._loss.only_update_value = False
@@ -164,12 +188,8 @@ class RLLearner(BaseLearner):
                 self._logger.info('value pretrain iter is 0')
             if self._use_distributed:
                 self._model.module.only_update_baseline = False
-                if self._rank == 0:
-                    self._logger.info(f'only update baseline: {self._model.module.only_update_baseline}')
             else:
                 self._model.only_update_baseline = False
-                if self._rank == 0:
-                    self._logger.info(f'only update baseline: {self._model.only_update_baseline}')
 
     def register_stats(self) -> None:
         """

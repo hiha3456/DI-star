@@ -12,6 +12,7 @@ import time
 import random
 from typing import Iterable, Callable, Any, Sequence
 import traceback
+from copy import deepcopy
 import numpy as np
 import requests
 import torch
@@ -26,6 +27,7 @@ from distar.ctools.torch_utils import sequence_mask
 from distar.ctools.torch_utils import to_device
 from distar.ctools.worker.coordinator.adapter import Adapter
 
+from distar.dizoo.envs.fake_data import fake_rl_traj_with_last
 
 def flat(data):
     if isinstance(data, torch.Tensor):
@@ -126,6 +128,20 @@ def _cuda_loop(cuda_queue, data_queue, device) -> None:
             # print('cuda time', time.time() - t)
             cuda_queue.put(data)
 
+class FakeDataQueue:
+    def __init__(self, traj_len, batch_size, buffer_size, collate_fn) -> None:
+        assert batch_size <= buffer_size, "for test batch_size should be smaller than buffer_size"
+        self._traj_len = traj_len
+        self._batch_size = batch_size
+        self._buffer_size = buffer_size
+        self.collate_fn = collate_fn
+        self.fake_traj_buffer = [fake_rl_traj_with_last(unroll_len=traj_len) for _ in range(buffer_size)]
+        
+    def get(self):
+        print('use fake data here')
+        batch_data = deepcopy(random.sample(self.fake_traj_buffer, self._batch_size))
+        batch_data = self.collate_fn(batch_data)
+        return batch_data
 
 class RLDataLoader(object):
     def __init__(
@@ -149,13 +165,19 @@ class RLDataLoader(object):
                 'use num_workers = 0 or 1 to disable multiprocessing.'
             )
 
-        context_str = 'spawn' if platform.system().lower() == 'windows' else 'forkserver'
-        mp_context = tm.get_context(context_str)
-        self.data_queue = mp_context.Queue(maxsize=self.num_workers)
-        self.workers = [mp_context.Process(target=worker_loop, args=(self._whole_cfg, self.data_queue, self.collate_fn, self.batch_size),
-                                           daemon=True) for _ in range(self.num_workers)]
-        for w in self.workers:
-            w.start()
+        self.data_queue = FakeDataQueue(
+            traj_len=self.cfg.trajectory_length, 
+            batch_size=self.cfg.batch_size, 
+            buffer_size=self.cfg.buffer_size,
+            collate_fn=self.collate_fn
+        )
+        # context_str = 'spawn' if platform.system().lower() == 'windows' else 'forkserver'
+        # mp_context = tm.get_context(context_str)
+        # self.data_queue = mp_context.Queue(maxsize=self.num_workers)
+        # self.workers = [mp_context.Process(target=worker_loop, args=(self._whole_cfg, self.data_queue, self.collate_fn, self.batch_size),
+        #                                    daemon=True) for _ in range(self.num_workers)]
+        # for w in self.workers:
+        #     w.start()
 
         # cuda thread
         if self.use_async_cuda and self.use_cuda:
