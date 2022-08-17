@@ -21,6 +21,7 @@ from .rl_training.rl_dataloader import RLDataLoader
 from .rl_training.rl_loss import ReinforcementLoss
 from .model.model import Model
 
+PRE_TRAIN_ITER = 100
 
 class RLLearner(BaseLearner):
     def __init__(self, cfg, *args):
@@ -144,7 +145,7 @@ class RLLearner(BaseLearner):
             # self._lr_scheduler.step()
         current_train_time = self._timer_all.value
         self._train_iter +=1 
-        if self._train_iter >= 100 and self._pre_train_finished is False:
+        if self._train_iter >= PRE_TRAIN_ITER and self._pre_train_finished is False:
             self._pre_train_finished = True
             self._train_iter = 0
         
