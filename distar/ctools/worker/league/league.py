@@ -159,7 +159,7 @@ class League(ABC):
         player_type = self.active_player_type(player_id)
         if player_type is None:
             return False
-        player_ckpt_path = os.path.join(self._path_model, '{}_ckpt.pth.tar'.format(player_id))
+        player_ckpt_path = os.path.join(os.path.dirname(__file__), 'sl_model.pth')
         player = player_type(checkpoint_path=player_ckpt_path,
                              player_id=player_id,
                              pipeline=pipeline,
@@ -290,7 +290,7 @@ class League(ABC):
             with self._lock:
                 player.reset_stats()
                 new_checkpoint_path = player.reset_checkpoint(self.active_players, self.historical_players, new_hp_id)
-                player.checkpoint_path = os.path.join(self._path_model, '{}_ckpt.pth.tar'.format(player.player_id))
+                player.checkpoint_path = os.path.join(os.path.dirname(__file__), 'sl_model.pth')
                 copyfile(new_checkpoint_path, player.checkpoint_path)
             self.save_successive_model(player)
             return {'reset_checkpoint_path': player.checkpoint_path}
