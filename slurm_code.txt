@@ -1,3 +1,6 @@
 bash dev-distar-check-actor-num.sh $env_num $cpu_num $coordinator_ip
-bash dev-distar-check-actor-num.sh 1 10 SH-IDC1-10-198-34-232
-bash dev-distar-check-actor-num.sh 2 20 SH-IDC1-10-198-34-160
+bash dev-distar-check-actor-num.sh 1 5 SH-IDC1-10-198-34-232
+bash dev-distar-check-actor-num.sh 2 10 SH-IDC1-10-198-34-159
+bash dev-distar-check-actor-num.sh 4 20 SH-IDC1-10-198-34-234
+bash dev-distar-check-actor-num.sh 8 40 SH-IDC1-10-198-34-160
+bash dev-distar-check-actor-num.sh 16 80 SH-IDC1-10-198-34-171
