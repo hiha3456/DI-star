@@ -90,23 +90,6 @@ class RLLearner(BaseLearner):
 
     def _train(self, data):
         self.step_value_pretrain()
-        if self._remain_value_pretrain_iters > 0:
-            staleness = 0
-            staleness_std = 0
-            staleness_max = 0
-        else:
-            model_last_iter = data.pop('model_last_iter')
-            model_curr_iter = self.last_iter.val
-            iter_diff = model_curr_iter - model_last_iter
-            if iter_diff.shape[0] == 1:
-                staleness = iter_diff.item()
-                staleness_std = 0
-                staleness_max = iter_diff.item()
-            else:
-                staleness_std, staleness, = torch.std_mean(iter_diff)
-                staleness_std = staleness_std.item()
-                staleness = staleness.item()
-                staleness_max = torch.max(iter_diff).item()
 
         with self._timer_all:
             with self._timer:
@@ -114,9 +97,6 @@ class RLLearner(BaseLearner):
                 if self._whole_cfg.learner.use_dapo:
                     model_output['successive_logit'] = data['successive_logit']
                 log_vars = self._loss.compute_loss(model_output)
-                log_vars['entropy/reward'] = staleness
-                log_vars['entropy/value'] = staleness_std
-                log_vars['entropy/td'] = staleness_max
 
                 loss = log_vars['total_loss']
             self._log_buffer['forward_time'] = self._timer.value
