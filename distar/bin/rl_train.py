@@ -124,8 +124,10 @@ if __name__ == '__main__':
     parser.add_argument("--init_method", type=str, default=None)
     parser.add_argument("--rank", type=int, default=0)
     parser.add_argument("--world_size", type=int, default=1)
+    parser.add_argument("--env_num", type=int, default=1)
     args = parser.parse_args()
     config = read_config(args.config)
+    config.actor.env_num = args.env_num
     config.common.type = 'rl'
     config.actor.traj_len = config.learner.data.trajectory_length
     config.learner.var_record_type = 'alphastar'
