@@ -42,7 +42,7 @@ def learner_run(config, args):
     shutil.copyfile(args.config, learner_config_path)
     RLLearner = import_module(config.learner.agent, 'RLLearner')
     if config.learner.use_distributed:
-        learner = RLLearner(config, "torch", args.init_method, args.rank, args.world_size)
+        learner = RLLearner(config, "slurm", args.init_method, args.rank, args.world_size)
     else:
         learner = RLLearner(config, "single_node")
 
