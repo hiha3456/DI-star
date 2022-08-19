@@ -4,8 +4,8 @@ import six
 import numpy as np
 import torch
 
-from pysc2.lib import features, actions, point, units
-from pysc2.maps.melee import Melee
+from distar.pysc2.lib import features, actions, point, units
+from distar.pysc2.maps.melee import Melee
 from s2clientprotocol import raw_pb2
 from s2clientprotocol import sc2api_pb2 as sc_pb
 from s2clientprotocol import score_pb2, common_pb2
