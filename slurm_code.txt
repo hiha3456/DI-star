@@ -1,2 +1,2 @@
-bash dev-distar-check-learner-speed.sh $coordinator_ip $learner_ip $learner_ip_long
-bash dev-distar-check-learner-speed.sh SH-IDC1-10-198-34-232 SH-IDC1-10-198-34-141 10.198.34.141
+bash dev-distar-check-learner-speed.sh $coordinator_slurm_ip $coordinator_ip
+bash dev-distar-check-learner-speed.sh SH-IDC1-10-198-34-209 10.198.34.209
