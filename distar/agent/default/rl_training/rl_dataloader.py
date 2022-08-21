@@ -139,7 +139,7 @@ class FakeDataQueue:
         
     def get(self):
         print('use fake data here')
-        batch_data = deepcopy(random.sample(self.fake_traj_buffer, self._batch_size))
+        batch_data = random.sample(self.fake_traj_buffer, self._batch_size)
         batch_data = self.collate_fn(batch_data)
         return batch_data
 
