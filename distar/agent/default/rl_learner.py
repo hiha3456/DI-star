@@ -138,7 +138,7 @@ class RLLearner(BaseLearner):
         self._timer_all = EasyTimer(self._use_cuda)
         self._total_train_time = 0
         self._pre_train_finished = False
-        self.tb_path = os.path.join(os.getcwd(), 'experiments', 'learner_speed', self._player_id)
+        self.tb_path = os.path.join(os.getcwd(), 'experiments', 'learner_speed_{}'.format(self._rank), self._player_id)
         self._writer = SummaryWriter(self.tb_path)
         self._mc = MemCache()
 
