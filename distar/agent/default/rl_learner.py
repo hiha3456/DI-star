@@ -20,8 +20,76 @@ from distar.ctools.worker.learner.learner_hook import LearnerHook, add_learner_h
 from .rl_training.rl_dataloader import RLDataLoader
 from .rl_training.rl_loss import ReinforcementLoss
 from .model.model import Model
+import gc
 
 PRE_TRAIN_ITER = 100
+
+class MemCache:
+
+    @staticmethod
+    def byte2MB(bt):
+        return round(bt / (1024 ** 2), 3)
+
+    def __init__(self):
+        self.dctn = {}
+        self.max_reserved = 0
+        self.max_allocate = 0
+
+    def mclean(self):
+        r0 = torch.cuda.memory_reserved(0)
+        a0 = torch.cuda.memory_allocated(0)
+        f0 = r0 - a0
+
+        for key in list(self.dctn.keys()):
+            del self.dctn[key]
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        r1 = torch.cuda.memory_reserved(0)
+        a1 = torch.cuda.memory_allocated(0)
+        f1 = r1 - a1
+
+        print('Mem Free')
+        print(f'Reserved  \t {MemCache.byte2MB(r1 - r0)}MB')
+        print(f'Allocated \t {MemCache.byte2MB(a1 - a0)}MB')
+        print(f'Free      \t {MemCache.byte2MB(f1 - f0)}MB')
+
+    def __setitem__(self, key, value):
+        self.dctn[key] = value
+        self.max_reserved = max(self.max_reserved, torch.cuda.memory_reserved(0))
+        self.max_allocate = max(self.max_allocate, torch.cuda.memory_allocated(0))
+
+    def __getitem__(self, item):
+        return self.dctn[item]
+
+    def __delitem__(self, *keys):
+        r0 = torch.cuda.memory_reserved(0)
+        a0 = torch.cuda.memory_allocated(0)
+        f0 = r0 - a0
+
+        for key in keys:
+            del self.dctn[key]
+
+        r1 = torch.cuda.memory_reserved(0)
+        a1 = torch.cuda.memory_allocated(0)
+        f1 = r1 - a1
+
+        print('Cuda Free')
+        print(f'Reserved  \t {MemCache.byte2MB(r1 - r0)}MB')
+        print(f'Allocated \t {MemCache.byte2MB(a1 - a0)}MB')
+        print(f'Free      \t {MemCache.byte2MB(f1 - f0)}MB')
+
+    def show_cuda_info(self):
+        t = torch.cuda.get_device_properties(0).total_memory
+        r = torch.cuda.memory_reserved(0)
+        a = torch.cuda.memory_allocated(0)
+        f = r - a
+
+        print('Cuda Info')
+        print(f'Total     \t{MemCache.byte2MB(t)} MB')
+        print(f'Reserved  \t{MemCache.byte2MB(r)} [{MemCache.byte2MB(self.max_reserved)}] MB')
+        print(f'Allocated \t{MemCache.byte2MB(a)} [{MemCache.byte2MB(self.max_allocate)}] MB')
+        print(f'Free      \t{MemCache.byte2MB(f)} MB')
 
 class RLLearner(BaseLearner):
     def __init__(self, cfg, *args):
@@ -72,6 +140,7 @@ class RLLearner(BaseLearner):
         self._pre_train_finished = False
         self.tb_path = os.path.join(os.getcwd(), 'experiments', 'learner_speed', self._player_id)
         self._writer = SummaryWriter(self.tb_path)
+        self._mc = MemCache()
 
     def _setup_model(self):
         self._model = Model(self._whole_cfg, use_value_network=True)
@@ -90,20 +159,22 @@ class RLLearner(BaseLearner):
 
     def _train(self, data):
         self.step_value_pretrain()
+        self._mc.show_cuda_info()
+        self._mc['data'] = data
 
         with self._timer_all:
             with self._timer:
-                model_output = self._model.rl_learner_forward(**data)
+                self._mc['model_output'] = self._model.rl_learner_forward(**self._mc['data'])
                 if self._whole_cfg.learner.use_dapo:
-                    model_output['successive_logit'] = data['successive_logit']
-                log_vars = self._loss.compute_loss(model_output)
+                    self._mc['model_output']['successive_logit'] = self._mc['data']['successive_logit']
+                self._mc['log_vars'] = self._loss.compute_loss(self._mc['model_output'])
 
-                loss = log_vars['total_loss']
+                self._mc['loss'] = self._mc['log_vars']['total_loss']
             self._log_buffer['forward_time'] = self._timer.value
 
             with self._timer:
                 self._optimizer.zero_grad()
-                loss.backward()
+                self._mc['loss'].backward()
                 if self._use_distributed:
                     self._model.sync_gradients()
                 if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
@@ -113,7 +184,7 @@ class RLLearner(BaseLearner):
                                                         global_step=self._last_iter.val)
                             self.model_tb_logger.add_scalar(k, (torch.norm(param.data)).item(),
                                                             global_step=self._last_iter.val)
-                gradient = self._grad_clip.apply(self._model.parameters())
+                self._mc['gradient'] = self._grad_clip.apply(self._model.parameters())
                 if self._save_grad and self._last_iter.val % self.save_log_freq == 0:
                     for k, param in self._model.named_parameters():
                         if param.grad is not None:
@@ -141,8 +212,8 @@ class RLLearner(BaseLearner):
             self._writer.add_scalar("total_train_speed/iter_s", self._train_iter / self._total_train_time, self._train_iter)
         else:
             print('we are now pretraining', self._train_iter)
-        self._log_buffer['gradient'] = gradient
-        self._log_buffer.update(log_vars)
+        self._log_buffer['gradient'] = self._mc['gradient']
+        self._log_buffer.update(self._mc['log_vars'])
         if self._update_config_flag:
             self.update_config()
             self._update_config_flag = False
@@ -152,6 +223,8 @@ class RLLearner(BaseLearner):
         if self._reset_comm_setting_flag:
             self.reset_comm_setting()
             self._reset_comm_setting_flag = False
+        self._mc.mclean()
+        self._mc.show_cuda_info()
 
     def step_value_pretrain(self):
         if self._remain_value_pretrain_iters > 0:
