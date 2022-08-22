@@ -120,7 +120,7 @@ class RLLearner(BaseLearner):
             model_ref = Model(self._whole_cfg, use_value_network=False).state_dict()
             self.comm.model_ref = {k: val.cpu().share_memory_() for k, val in model_ref.items()}
             self.comm._register_learner(self, self._ip, self._port, self._rank, self.world_size)
-            self.comm.start_send_model()
+            # self.comm.start_send_model()
             self._reset_value_flag = False
             self._update_config_flag = False
             self._reset_comm_setting_flag = False
@@ -328,7 +328,7 @@ class RLLearner(BaseLearner):
         self.comm._register_learner(self, self._ip, self._port, self._rank, self.world_size)
         model_ref = Model(self._whole_cfg, use_value_network=False).state_dict()
         self.comm.model_ref = {k: val.cpu().share_memory_() for k, val in model_ref.items()}
-        self.comm.start_send_model()
+        # self.comm.start_send_model()
 
     def _reset_dataloader(self):
 
@@ -366,10 +366,11 @@ class SendModelHook(LearnerHook):
         super(SendModelHook, self).__init__(name=name, position=position, priority=priority)
 
     def __call__(self, engine):
-        if self.position == 'before_run':
-            engine.comm.send_model(engine, ignore_freq=True)
-        elif self.position == 'after_iter':
-            engine.comm.send_model(engine)
+        pass
+        # if self.position == 'before_run':
+        #     engine.comm.send_model(engine, ignore_freq=True)
+        # elif self.position == 'after_iter':
+        #     engine.comm.send_model(engine)
 
 
 class SendTrainInfo(LearnerHook):
