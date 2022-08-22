@@ -17,6 +17,8 @@ from distar.ctools.utils.file_helper import redis,dumps
 from distar.ctools.utils import broadcast
 from distar.ctools.worker.coordinator.adapter import Adapter
 
+SEND_MODEL_FREQ_TIME = 30
+
 class LearnerComm:
     def __init__(self, cfg):
         self._whole_cfg = cfg
@@ -36,7 +38,10 @@ class LearnerComm:
         self._requests_session.mount('http://', HTTPAdapter(max_retries=retries))
 
         self._model_fs_type = self._whole_cfg.communication.get('model_fs_type', 'torch')
-
+        
+        self._last_time = None
+        self._total_recv_time = 0
+        self._send_model_num = 0
 
     def _register_learner(self, learner,ip,port,rank,world_size) -> None:
         request_info = {'player_id': self.player_id,'ip':ip,'port':port,'rank':rank,'world_size':world_size}
@@ -70,12 +75,21 @@ class LearnerComm:
         torch.set_num_threads(max(torch.get_num_threads() // 8, 1))
 
     def send_model(self, learner, ignore_freq=False, reset_flag=False) -> None:
-        if ignore_freq or (self._send_model_count % self._send_model_freq == 0 and learner._remain_value_pretrain_iters< 0) :
+        if self._last_time is None:
+            self._last_time = time.time()
+        
+        this_time = time.time()
+        current_time = this_time - self._last_time
+        self._total_recv_time += current_time
+        self._last_time = this_time
+        
+        if ignore_freq or (self._total_recv_time // SEND_MODEL_FREQ_TIME > self._send_model_num and learner._remain_value_pretrain_iters< 0) :
             state_dict = to_device({k: v for k, v in learner.model.state_dict().items() if 'value_networks' not in k and 'value_encoder' not in k},device='cpu')
             for k,val in state_dict.items():
                 self._model_ref[k].copy_(val)
             for i in range(self._send_model_worker_num):
                 self._model_parent_conn[i].send((learner.last_iter.val, reset_flag))
+            self._send_model_num = self._total_recv_time // SEND_MODEL_FREQ_TIME
             
         if not ignore_freq:
             self._send_model_count += 1
