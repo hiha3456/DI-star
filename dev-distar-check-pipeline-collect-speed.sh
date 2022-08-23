@@ -11,7 +11,7 @@ srun --partition=cpu --quotatype spot --job-name=league_pipeline_collect_speed_$
 srun --partition=cpu --quotatype spot --job-name=coordinator_pipeline_collect_speed_$6 -w $1 \
     --mpi=pmi2 --async --output=./check-pipeline-collect-speed-logs-$6/coordinator_output_check_pipeline_collect_speed_$6.txt \
     python -m distar.bin.rl_train --type coordinator --coordinator_ip $2
-srun --partition=cpu --quotatype spot -N $6 --job-name=actor_pipeline_collect_speed_$6 -w $7 -c 15 \
+srun --partition=cpu --quotatype spot -n $6 --job-name=actor_pipeline_collect_speed_$6 -w $7 -c 15 \
     --mpi=pmi2 --async --output=./check-pipeline-collect-speed-logs-$6/actor_output_check_pipeline_collect_speed_$6.txt \
     python -m distar.bin.rl_train --type actor --coordinator_ip $2 --env_num 3
 for ((i=0; i<8; i++))
