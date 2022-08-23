@@ -1,0 +1,17 @@
+bash dev-distar-check-pipeline-collect-speed.sh \
+    $coordinator_slurm_ip \
+    $coordinator_ip \
+    $learner_1_slurm_ip \
+    $learner_2_slurm_ip \
+    $init_method_tcp_ip_port \
+    $env_num\
+    $cpu_num
+
+bash dev-distar-check-pipeline-collect-speed.sh \
+    SH-IDC1-10-198-34-209 \
+    10.198.34.209 \
+    SH-IDC1-10-198-34-137 \
+    SH-IDC1-10-198-34-148 \
+    tcp://10.198.34.137:12345 \
+    1 \
+    2
