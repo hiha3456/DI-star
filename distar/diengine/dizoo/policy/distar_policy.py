@@ -149,7 +149,7 @@ class DIStarPolicy(Policy):
     def _init_learn(self):
         self._learn_model = model_wrap(self._model, 'base')
         # TODO(zms): maybe initialize state_dict inside learner
-        learn_model_path = osp.join(osp.dirname(__file__), self._cfg.model_path)
+        learn_model_path = osp.join(os.getcwd(), self._cfg.model_path)
 
         learn_state_dict = torch.load(learn_model_path, map_location=self._device)
         
@@ -416,7 +416,7 @@ class DIStarPolicy(Policy):
     def _init_collect(self):
         self._collect_model = model_wrap(self._model, 'base')
         # TODO(zms): maybe initialize state_dict inside actor
-        collect_model_path = osp.join(osp.dirname(__file__), self._cfg.model_path)
+        collect_model_path = osp.join(os.getcwd(), self._cfg.model_path)
         
         collect_state_dict = torch.load(collect_model_path, self._device)
 
