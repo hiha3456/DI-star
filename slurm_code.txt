@@ -1,4 +1,4 @@
-bash dev-distar-check-pipeline-collect-speed.sh \
+bash dev-distar-test.sh \
     $coordinator_slurm_ip \
     $coordinator_ip \
     $learner_1_slurm_ip \
