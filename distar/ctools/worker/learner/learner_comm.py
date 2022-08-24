@@ -129,6 +129,7 @@ class LearnerComm:
                     '{} reset checkpoint in {}!!!!!!!!!!!!!!!!!'.format(learner.comm.player_id, reset_checkpoint_path))
                 learner.comm.send_model(learner, ignore_freq=True, reset_flag=True)
         if learner.world_size > 1:
+            flag = to_device(flag, torch.cuda.current_device())
             broadcast(flag, 0) 
             if flag:
                 learner._remain_value_pretrain_iters = self._whole_cfg.learner.get('value_pretrain_iters', -1)
