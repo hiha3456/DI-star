@@ -436,7 +436,7 @@ class DIStarPolicy(Policy):
         self.teacher_model = model_wrap(Model(self._cfg.model), 'base')
         if self._cuda:
             self.teacher_model = self.teacher_model.cuda()
-        teacher_model_path = osp.join(osp.dirname(__file__), self._cfg.teacher_model_path)
+        teacher_model_path = osp.join(os.getcwd(), self._cfg.teacher_model_path)
         print("self._cuda is ", self._cuda)
 
         t_state_dict = torch.load(teacher_model_path, self._device)
