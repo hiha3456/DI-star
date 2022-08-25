@@ -15,7 +15,7 @@ import traceback
 import numpy as np
 import requests
 import os
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.multiprocessing as tm
 import torch.nn.functional as F
