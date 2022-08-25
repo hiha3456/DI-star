@@ -27,6 +27,7 @@ from distar.ctools.data.collate_fn import default_collate_with_dim
 from distar.ctools.torch_utils import sequence_mask
 from distar.ctools.torch_utils import to_device
 from distar.ctools.worker.coordinator.adapter import Adapter
+from distar.ctools.utils.dist_helper import get_rank
 
 PRE_RECV_TIME = 10 * 60
 
@@ -86,7 +87,7 @@ def worker_loop(cfg, data_queue, collate_fn, batch_size) -> None:
     last_time = time.time()
     total_recv_time = 0
     pre_collect_finished = False
-    tb_path = os.path.join(os.getcwd(), 'experiments', 'total_pipeline_{}_traj'.format(player_id))
+    tb_path = os.path.join(os.getcwd(), 'experiments', 'total_pipeline_{}_traj_rank_{}'.format(player_id, get_rank()))
     writer = SummaryWriter(tb_path)
 
     adapter = Adapter(cfg=cfg)
