@@ -88,7 +88,7 @@ def dist_init(backend: str = 'nccl',
     os.environ['MASTER_PORT'] = port or os.environ.get('MASTER_PORT', "10314")  # hard-code
 
     if rank is None:
-        local_id = os.environ.get('SLURM_LOCALID', os.environ.get('RANK', None))
+        local_id = os.environ.get('SLURM_PROCID', 0)
         if local_id is None:
             raise RuntimeError("please indicate rank explicitly in dist_init method")
         else:
