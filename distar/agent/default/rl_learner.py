@@ -7,10 +7,9 @@ import time
 import portpicker
 import torch
 from flask import Flask
-from tensorboardX import SummaryWriter
 from torch.optim.adam import Adam
 import logging
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from distar.ctools.utils import broadcast, EasyTimer
 from distar.ctools.utils.config_helper import read_config, deep_merge_dicts, save_config
