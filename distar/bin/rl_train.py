@@ -133,8 +133,8 @@ if __name__ == '__main__':
     config.common.type = 'rl'
     config.actor.traj_len = config.learner.data.trajectory_length
     config.learner.var_record_type = 'alphastar'
-    if args.init_method is not None:
-        config.learner.use_distributed = True
+    # if args.init_method is not None:
+    config.learner.use_distributed = True
     if args.task == 'bot':
         config.league.vs_bot = True
         config.learner.use_value_feature = False
