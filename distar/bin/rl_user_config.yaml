@@ -28,7 +28,7 @@ learner:
   job_type: 'train' # 'train' or 'test'
   load_path: '' # load checkpoint when resume
   use_cuda: True
-  use_distributed: False
+  use_distributed: True
   use_value_feature: True  # whether to use value feature, this must be False when play against bot
   load_last_iter: True  # whether to load last iter in checkpoint
   load_optimizer: False  # whether to load optimizer in checkpoint

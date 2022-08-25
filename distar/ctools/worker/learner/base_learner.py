@@ -54,7 +54,7 @@ class BaseLearner(ABC):
         self._use_cuda = self._whole_cfg.learner.use_cuda and torch.cuda.is_available()
         self._use_distributed = self._whole_cfg.learner.use_distributed and self._use_cuda
         if self._use_distributed:
-            self._rank, self._world_size = dist_init(method=method, init_method=init_method, rank=rank, world_size=world_size)
+            self._rank, self._world_size = dist_init()
         else:
             self._rank, self._world_size = 0, 1
         self._device = torch.cuda.current_device() if self._use_cuda else 'cpu'
