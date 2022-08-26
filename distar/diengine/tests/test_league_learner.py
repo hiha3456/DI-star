@@ -13,12 +13,12 @@ from ding.framework import EventEnum
 from ding.framework.task import task, Parallel
 from ding.framework.middleware import data_pusher, OffPolicyLearner, LeagueLearnerCommunicator
 from ding.framework.middleware.functional.actor_data import *
-from distar.diengine.dizoo.policy.distar_policy import DIStarPolicy
+from distar.diengine.policy.distar_policy import DIStarPolicy
 from ding.league.v2 import BaseLeague
 from ding.utils import log_every_sec
-from distar.diengine.dizoo.config import distar_cfg
-from distar.diengine.dizoo.envs import fake_rl_traj_with_last
-from distar.diengine.dizoo.envs.distar_env import DIStarEnv
+from distar.diengine.config import distar_cfg
+from distar.diengine.envs import fake_rl_traj_with_last
+from distar.diengine.envs.distar_env import DIStarEnv
 from distar.ctools.utils import read_config
 
 

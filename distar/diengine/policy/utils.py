@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from ding.torch_utils import flatten, sequence_mask
 from ding.utils.data import default_collate
-from distar.diengine.dizoo.envs import MAX_SELECTED_UNITS_NUM
+from distar.diengine.envs import MAX_SELECTED_UNITS_NUM
 
 MASK_INF = -1e9
 EPS = 1e-9

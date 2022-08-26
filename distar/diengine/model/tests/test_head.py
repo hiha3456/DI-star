@@ -2,7 +2,7 @@ import pytest
 import torch
 from easydict import EasyDict
 from ding.utils import read_yaml_config
-from distar.diengine.dizoo.model.head import ActionTypeHead, DelayHead, SelectedUnitsHead, TargetUnitHead, LocationHead, \
+from distar.diengine.model.head import ActionTypeHead, DelayHead, SelectedUnitsHead, TargetUnitHead, LocationHead, \
     QueuedHead
 B, ENTITY = 4, 128
 total_config = EasyDict(read_yaml_config('../actor_critic_default_config.yaml'))

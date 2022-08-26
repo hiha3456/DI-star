@@ -8,7 +8,7 @@ import torch.nn as nn
 
 from ding.utils import read_yaml_config, deep_merge_dicts
 from ding.torch_utils import detach_grad, script_lstm
-from distar.diengine.dizoo.envs import MAX_SELECTED_UNITS_NUM
+from distar.diengine.envs import MAX_SELECTED_UNITS_NUM
 from .encoder import Encoder
 from .obs_encoder.value_encoder import ValueEncoder
 from .policy import Policy

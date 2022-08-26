@@ -3,64 +3,19 @@ import pytest
 from easydict import EasyDict
 from copy import deepcopy
 from unittest.mock import patch
-from typing import TYPE_CHECKING, Any, List, Dict, Optional
 
-from ding.data.buffer.middleware import use_time_check
 from ding.data import DequeBuffer
-from ding.envs import EnvSupervisor
+from ding.envs.env_manager.env_supervisor import EnvSupervisor
 from ding.framework.supervisor import ChildType
 from ding.framework.context import BattleContext
 from ding.framework.middleware import StepLeagueActor, LeagueCoordinator, LeagueLearnerCommunicator, data_pusher, OffPolicyLearner
 from ding.framework.middleware.functional.collector import battle_inferencer_for_distar, battle_rolloutor_for_distar
 from ding.framework.task import task, Parallel
 from ding.league.v2 import BaseLeague
-from distar.diengine.dizoo.config import distar_cfg
-from distar.diengine.dizoo.envs.distar_env import DIStarEnv
-from distar.diengine.dizoo.envs.fake_data import rl_step_data
-from distar.diengine.dizoo.policy.distar_policy import DIStarPolicy
-
-
-class DIstarCollectMode:
-
-    def __init__(self) -> None:
-        self._cfg = EasyDict(dict(collect=dict(n_episode=1)))
-        self._race = 'zerg'
-
-    def load_state_dict(self, state_dict):
-        return
-
-    def get_attribute(self, name: str) -> Any:
-        if hasattr(self, '_get_' + name):
-            return getattr(self, '_get_' + name)()
-        elif hasattr(self, '_' + name):
-            return getattr(self, '_' + name)
-        else:
-            raise NotImplementedError
-
-    def reset(self, data_id: Optional[List[int]] = None) -> None:
-        pass
-
-    def forward(self, policy_obs: Dict[int, Any]) -> Dict[int, Any]:
-        # print("Call forward_collect:")
-        return_data = {}
-        return_data['action'] = DIStarEnv.random_action(policy_obs)
-        return_data['logit'] = [1]
-        return_data['value'] = [0]
-
-        return return_data
-
-    def process_transition(self, obs, model_output, timestep) -> dict:
-        step_data = rl_step_data()
-        step_data['done'] = timestep.done
-        return step_data
-
-
-class DIStarMockPolicyCollect:
-
-    def __init__(self):
-
-        self.collect_mode = DIstarCollectMode()
-
+from distar.diengine.config import distar_cfg
+from distar.diengine.envs.distar_env import DIStarEnv
+from distar.diengine.policy.distar_policy import DIStarPolicy
+from ding.data.buffer.middleware import use_time_check
 
 env_cfg = dict(
     actor=dict(job_type='train', ),
@@ -112,37 +67,53 @@ class PrepareTest():
 
     @classmethod
     def collect_policy_fn(cls):
-        policy = DIStarMockPolicyCollect()
+        policy = DIStarPolicy(DIStarPolicy.default_config(), enable_field=['collect'])
         return policy
+
+
+def coordinator():
+    coordinator_league = BaseLeague(cfg.policy.other.league)
+    task.use(LeagueCoordinator(cfg, coordinator_league))
+
+
+def learner():
+    league = BaseLeague(cfg.policy.other.league)
+    N_PLAYERS = len(league.active_players_ids)
+
+    cfg.policy.collect.unroll_len = 1
+    player = league.active_players[task.router.node_id % N_PLAYERS]
+    del league
+
+    buffer_ = DequeBuffer(size=cfg.policy.other.replay_buffer.replay_buffer_size)
+    buffer_.use(use_time_check(buffer_, max_use=cfg.policy.other.replay_buffer.max_use))
+    policy = PrepareTest.policy_fn()
+
+    task.use(LeagueLearnerCommunicator(cfg, policy.learn_mode, player))
+    task.use(data_pusher(cfg, buffer_))
+    task.use(OffPolicyLearner(cfg, policy.learn_mode, buffer_))
+
+
+def actor():
+    task.use(StepLeagueActor(cfg, PrepareTest.get_env_supervisor, PrepareTest.collect_policy_fn))
 
 
 def main():
     logging.getLogger().setLevel(logging.INFO)
     league = BaseLeague(cfg.policy.other.league)
     N_PLAYERS = len(league.active_players_ids)
+    del league
     print("League: n_players =", N_PLAYERS)
 
-    with task.start(async_mode=True, ctx=BattleContext()),\
+    with task.start(async_mode=False, ctx=BattleContext()),\
       patch("ding.framework.middleware.collector.battle_inferencer", battle_inferencer_for_distar),\
       patch("ding.framework.middleware.collector.battle_rolloutor", battle_rolloutor_for_distar):
         print("node id:", task.router.node_id)
         if task.router.node_id == 0:
-            coordinator_league = BaseLeague(cfg.policy.other.league)
-            task.use(LeagueCoordinator(cfg, coordinator_league))
+            coordinator()
         elif task.router.node_id <= N_PLAYERS:
-            cfg.policy.collect.unroll_len = 1
-            player = league.active_players[task.router.node_id % N_PLAYERS]
-
-            buffer_ = DequeBuffer(size=cfg.policy.other.replay_buffer.replay_buffer_size)
-            buffer_.use(use_time_check(buffer_, max_use=cfg.policy.other.replay_buffer.max_use))
-            policy = PrepareTest.policy_fn()
-
-            task.use(LeagueLearnerCommunicator(cfg, policy.learn_mode, player))
-            task.use(data_pusher(cfg, buffer_))
-            task.use(OffPolicyLearner(cfg, policy.learn_mode, buffer_))
+            learner()
         else:
-            task.use(StepLeagueActor(cfg, PrepareTest.get_env_supervisor, PrepareTest.collect_policy_fn))
-
+            actor()
         task.run()
 
 

@@ -4,7 +4,7 @@ import shutil
 from distar.ctools.utils import read_config
 import torch
 from ding.envs import BaseEnvManager
-from distar.diengine.dizoo.envs import DIStarEnv
+from distar.diengine.envs import DIStarEnv
 import traceback
 
 from easydict import EasyDict

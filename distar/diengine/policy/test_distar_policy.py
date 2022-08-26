@@ -1,7 +1,7 @@
 import pytest
 
-from distar.diengine.dizoo.policy import DIStarPolicy
-from distar.diengine.dizoo.envs import get_fake_rl_batch, get_fake_env_reset_data, get_fake_env_step_data
+from distar.diengine.policy import DIStarPolicy
+from distar.diengine.envs import get_fake_rl_batch, get_fake_env_reset_data, get_fake_env_step_data
 
 import torch
 from ding.utils import set_pkg_seed

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from ding.torch_utils import fc_block, build_activation, conv2d_block, ResBlock, same_shape, sequence_mask, \
     Transformer, scatter_connection_v2
-from distar.diengine.dizoo.envs import BEGIN_ACTIONS
+from distar.diengine.envs import BEGIN_ACTIONS
 from .spatial_encoder import SpatialEncoder
 from .scalar_encoder import BeginningBuildOrderEncoder
 

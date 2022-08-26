@@ -23,8 +23,8 @@ from ding.rl_utils import td_lambda_data, td_lambda_error, vtrace_data_with_rho,
 from ding.utils import EasyTimer
 from ding.utils.data import default_collate, default_decollate
 from ding.envs.env.base_env import BaseEnvTimestep
-from distar.diengine.dizoo.model import Model
-from distar.diengine.dizoo.envs import NUM_UNIT_TYPES, ACTIONS, NUM_CUMULATIVE_STAT_ACTIONS, DEFAULT_SPATIAL_SIZE, BEGINNING_ORDER_LENGTH, BEGINNING_ORDER_ACTIONS, UNIT_TO_CUM, UPGRADE_TO_CUM, UNIT_ABILITY_TO_ACTION, QUEUE_ACTIONS, CUMULATIVE_STAT_ACTIONS,\
+from distar.diengine.model import Model
+from distar.diengine.envs import NUM_UNIT_TYPES, ACTIONS, NUM_CUMULATIVE_STAT_ACTIONS, DEFAULT_SPATIAL_SIZE, BEGINNING_ORDER_LENGTH, BEGINNING_ORDER_ACTIONS, UNIT_TO_CUM, UPGRADE_TO_CUM, UNIT_ABILITY_TO_ACTION, QUEUE_ACTIONS, CUMULATIVE_STAT_ACTIONS,\
     Stat, parse_new_game, transform_obs, compute_battle_score
 from .utils import collate_fn_learn, kl_error, entropy_error
 

@@ -1,6 +1,6 @@
 import pytest
 import torch
-from distar.diengine.dizoo.model.value import ValueBaseline
+from distar.diengine.model.value import ValueBaseline
 
 
 @pytest.mark.envtest

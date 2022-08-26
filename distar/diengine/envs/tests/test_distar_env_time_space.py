@@ -6,7 +6,7 @@ import torch
 import time
 import sys
 
-from distar.diengine.dizoo.envs import DIStarEnv
+from distar.diengine.envs import DIStarEnv
 import traceback
 
 class TestDIstarEnv:

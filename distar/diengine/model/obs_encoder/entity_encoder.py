@@ -4,7 +4,7 @@ from typing import Dict
 from torch import Tensor
 
 from ding.torch_utils import fc_block, build_activation, sequence_mask, Transformer
-from distar.diengine.dizoo.envs import MAX_ENTITY_NUM
+from distar.diengine.envs import MAX_ENTITY_NUM
 
 
 def get_binary_embed_mat(bit_num):

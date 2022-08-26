@@ -4,8 +4,8 @@ from copy import deepcopy
 from unittest.mock import patch
 from easydict import EasyDict
 
-from distar.diengine.dizoo.config import distar_cfg
-from distar.diengine.dizoo.envs.distar_env import DIStarEnv
+from distar.diengine.config import distar_cfg
+from distar.diengine.envs.distar_env import DIStarEnv
 
 from ding.envs import EnvSupervisor
 from ding.league.player import PlayerMeta
@@ -18,7 +18,7 @@ from ding.framework.context import BattleContext
 from ding.framework.supervisor import ChildType
 from ding.framework.middleware import StepLeagueActor
 from ding.framework.middleware.functional import ActorData
-from distar.diengine.dizoo.policy.distar_policy import DIStarPolicy
+from distar.diengine.policy.distar_policy import DIStarPolicy
 from ding.framework.middleware.league_learner_communicator import LearnerModel
 from ding.framework.middleware.functional.collector import battle_inferencer_for_distar, battle_rolloutor_for_distar
 

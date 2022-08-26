@@ -3,7 +3,7 @@ from torch import Tensor
 import torch
 import torch.nn as nn
 
-from distar.diengine.dizoo.envs import SELECTED_UNITS_MASK
+from distar.diengine.envs import SELECTED_UNITS_MASK
 from .head import DelayHead, QueuedHead, SelectedUnitsHead, TargetUnitHead, LocationHead, ActionTypeHead
 
 

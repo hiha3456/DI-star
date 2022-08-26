@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ding.torch_utils import ResFCBlock, fc_block, build_activation2
-from distar.diengine.dizoo.envs import ACTION_RACE_MASK
+from distar.diengine.envs import ACTION_RACE_MASK
 
 
 class ActionTypeHead(nn.Module):

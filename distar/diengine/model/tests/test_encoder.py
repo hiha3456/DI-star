@@ -3,8 +3,8 @@ import pytest
 import torch
 from ding.utils import read_yaml_config
 from ding.utils.data import default_collate
-from distar.diengine.dizoo.model.encoder import Encoder
-from distar.diengine.dizoo.envs.fake_data import scalar_info, entity_info, spatial_info
+from distar.diengine.model.encoder import Encoder
+from distar.diengine.envs.fake_data import scalar_info, entity_info, spatial_info
 
 
 @pytest.mark.envtest
