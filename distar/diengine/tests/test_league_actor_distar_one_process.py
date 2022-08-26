@@ -6,6 +6,7 @@ from easydict import EasyDict
 
 from distar.diengine.config import distar_cfg
 from distar.diengine.envs.distar_env import DIStarEnv
+from distar.diengine.middleware import DIstarBattleStepCollector
 
 from ding.envs import EnvSupervisor
 from ding.league.player import PlayerMeta
@@ -18,9 +19,9 @@ from ding.framework.context import BattleContext
 from ding.framework.supervisor import ChildType
 from ding.framework.middleware import StepLeagueActor
 from ding.framework.middleware.functional import ActorData
+from distar.diengine.middleware.collector import last_step_fn
 from distar.diengine.policy.distar_policy import DIStarPolicy
 from ding.framework.middleware.league_learner_communicator import LearnerModel
-from ding.framework.middleware.functional.collector import battle_inferencer_for_distar, battle_rolloutor_for_distar
 
 env_cfg = dict(
     actor=dict(job_type='train', ),
@@ -136,14 +137,13 @@ def test_league_actor():
 
             return _test_actor
 
-        with patch("ding.framework.middleware.collector.battle_inferencer", battle_inferencer_for_distar):
-            with patch("ding.framework.middleware.collector.battle_rolloutor", battle_rolloutor_for_distar):
-                league_actor = StepLeagueActor(
-                    cfg=cfg, env_fn=PrepareTest.get_env_supervisor, policy_fn=PrepareTest.collect_policy_fn
-                )
-                task.use(test_actor())
-                task.use(league_actor)
-                task.run()
+        with patch("ding.framework.middleware.league_actor.BattleStepCollector", DIstarBattleStepCollector):
+            league_actor = StepLeagueActor(
+                cfg=cfg, env_fn=PrepareTest.get_env_supervisor, policy_fn=PrepareTest.collect_policy_fn, last_step_fn=last_step_fn
+            )
+            task.use(test_actor())
+            task.use(league_actor)
+            task.run()
 
 
 if __name__ == '__main__':

@@ -1,27 +1,114 @@
 from easydict import EasyDict
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING, List, Callable
 import time
 from ditk import logging
 
-from ding.policy import get_random_policy
-from ding.envs import BaseEnvManager
+from ding.envs import BaseEnvManager, BaseEnvTimestep
 from ding.utils import log_every_sec
 from ding.framework import task
 from ding.framework.middleware.functional import PlayerModelInfo
-from .functional import inferencer, rolloutor, TransitionList, BattleTransitionList, \
-    battle_inferencer, battle_rolloutor
+from ding.framework.middleware.functional.collector import BattleTransitionList
+import treetensor.torch as ttorch
 
 if TYPE_CHECKING:
-    from ding.framework import OnlineRLContext, BattleContext
+    from ding.framework import BattleContext
+
+
+def battle_inferencer_for_distar(cfg: EasyDict, env: BaseEnvManager):
+
+    def _battle_inferencer(ctx: "BattleContext"):
+        # Get current env obs.
+        obs = env.ready_obs
+        assert isinstance(obs, dict)
+
+        ctx.obs = obs
+
+        # Policy forward.
+        inference_output = {}
+        actions = {}
+        for env_id in ctx.obs.keys():
+            observations = obs[env_id]
+            inference_output[env_id] = {}
+            actions[env_id] = {}
+            for policy_id, policy_obs in observations.items():
+                # policy.forward
+                output = ctx.current_policies[policy_id].forward(policy_obs)
+                inference_output[env_id][policy_id] = output
+                actions[env_id][policy_id] = output['action']
+        ctx.inference_output = inference_output
+        ctx.actions = actions
+
+    return _battle_inferencer
+
+
+def battle_rolloutor_for_distar(cfg: EasyDict, env: BaseEnvManager, transitions_list: List, model_info_dict: Dict):
+
+    def _battle_rolloutor(ctx: "BattleContext"):
+        timesteps = env.step(ctx.actions)
+        ctx.total_envstep_count += len(timesteps)
+        ctx.env_step += len(timesteps)
+
+        if isinstance(timesteps, list):
+            new_time_steps = {}
+            for env_id, timestep in enumerate(timesteps):
+                new_time_steps[env_id] = timestep
+            timesteps = new_time_steps
+
+        for env_id, timestep in timesteps.items():
+            if timestep.info.get('abnormal'):
+                for policy_id, policy in enumerate(ctx.current_policies):
+                    transitions_list[policy_id].clear_newest_episode(env_id, before_append=True)
+                    policy.reset(env.ready_obs[0][policy_id])
+                continue
+
+            episode_long_enough = True
+            for policy_id, policy in enumerate(ctx.current_policies):
+                if timestep.obs.get(policy_id):
+                    policy_timestep = BaseEnvTimestep(
+                        obs=timestep.obs.get(policy_id),
+                        reward=timestep.reward[policy_id],
+                        done=timestep.done,
+                        info=timestep.info[policy_id]
+                    )
+                    transition = policy.process_transition(obs=None, model_output=None, timestep=policy_timestep)
+                    transition = EasyDict(transition)
+                    transition.collect_train_iter = ttorch.as_tensor(
+                        [model_info_dict[ctx.player_id_list[policy_id]].update_train_iter]
+                    )
+
+                    # 2nd case when the number of transitions in one of all the episodes is shorter than unroll_len
+                    episode_long_enough = episode_long_enough and transitions_list[policy_id].append(env_id, transition)
+
+            if timestep.done:
+                for policy_id, policy in enumerate(ctx.current_policies):
+                    policy.reset(env.ready_obs[0][policy_id])
+                    ctx.episode_info[policy_id].append(timestep.info[policy_id])
+
+            if not episode_long_enough:
+                for policy_id, _ in enumerate(ctx.current_policies):
+                    transitions_list[policy_id].clear_newest_episode(env_id)
+                    ctx.episode_info[policy_id].pop()
+            elif timestep.done:
+                ctx.env_episode += 1
+
+    return _battle_rolloutor
+
 
 WAIT_MODEL_TIME = float('inf')
 
 
-class BattleStepCollector:
+def last_step_fn(last_step):
+    for k in ['mask', 'action_info', 'teacher_logit', 'behaviour_logp', 'selected_units_num', 'reward', 'step']:
+        last_step.pop(k)
+    return last_step
+
+
+
+class DIstarBattleStepCollector:
 
     def __init__(
         self, cfg: EasyDict, env: BaseEnvManager, unroll_len: int, model_dict: Dict, model_info_dict: Dict,
-        player_policy_collect_dict: Dict, agent_num: int
+        player_policy_collect_dict: Dict, agent_num: int, last_step_fn: Callable = None
     ):
         self.cfg = cfg
         self.end_flag = False
@@ -36,12 +123,12 @@ class BattleStepCollector:
         self.player_policy_collect_dict = player_policy_collect_dict
         self.agent_num = agent_num
 
-        self._battle_inferencer = task.wrap(battle_inferencer(self.cfg, self.env))
+        self._battle_inferencer = task.wrap(battle_inferencer_for_distar(self.cfg, self.env))
         self._transitions_list = [
-            BattleTransitionList(self.env.env_num, self.unroll_len) for _ in range(self.agent_num)
+            BattleTransitionList(self.env.env_num, self.unroll_len, last_step_fn) for _ in range(self.agent_num)
         ]
         self._battle_rolloutor = task.wrap(
-            battle_rolloutor(self.cfg, self.env, self._transitions_list, self.model_info_dict)
+            battle_rolloutor_for_distar(self.cfg, self.env, self._transitions_list, self.model_info_dict)
         )
 
     def __del__(self) -> None:
@@ -131,111 +218,3 @@ class BattleStepCollector:
                     for transitions in self._transitions_list:
                         transitions.clear()
                 break
-
-
-# TODO BattleEpisodeCollector
-
-class StepCollector:
-    """
-    Overview:
-        The class of the collector running by steps, including model inference and transition \
-            process. Use the `__call__` method to execute the whole collection process.
-    """
-
-    def __init__(self, cfg: EasyDict, policy, env: BaseEnvManager, random_collect_size: int = 0) -> None:
-        """
-        Arguments:
-            - cfg (:obj:`EasyDict`): Config.
-            - policy (:obj:`Policy`): The policy to be collected.
-            - env (:obj:`BaseEnvManager`): The env for the collection, the BaseEnvManager object or \
-                its derivatives are supported.
-            - random_collect_size (:obj:`int`): The count of samples that will be collected randomly, \
-                typically used in initial runs.
-        """
-        self.cfg = cfg
-        self.env = env
-        self.policy = policy
-        self.random_collect_size = random_collect_size
-        self._transitions = TransitionList(self.env.env_num)
-        self._inferencer = task.wrap(inferencer(cfg, policy, env))
-        self._rolloutor = task.wrap(rolloutor(cfg, policy, env, self._transitions))
-
-    def __call__(self, ctx: "OnlineRLContext") -> None:
-        """
-        Overview:
-            An encapsulation of inference and rollout middleware. Stop when completing \
-                the target number of steps.
-        Input of ctx:
-            - env_step (:obj:`int`): The env steps which will increase during collection.
-        """
-        old = ctx.env_step
-        if self.random_collect_size > 0 and old < self.random_collect_size:
-            target_size = self.random_collect_size - old
-            random_policy = get_random_policy(self.cfg, self.policy, self.env)
-            current_inferencer = task.wrap(inferencer(self.cfg, random_policy, self.env))
-        else:
-            # compatible with old config, a train sample = unroll_len step
-            target_size = self.cfg.policy.collect.n_sample * self.cfg.policy.collect.unroll_len
-            current_inferencer = self._inferencer
-
-        while True:
-            current_inferencer(ctx)
-            self._rolloutor(ctx)
-            if ctx.env_step - old >= target_size:
-                ctx.trajectories, ctx.trajectory_end_idx = self._transitions.to_trajectories()
-                self._transitions.clear()
-                break
-
-
-class EpisodeCollector:
-    """
-    Overview:
-        The class of the collector running by episodes, including model inference and transition \
-            process. Use the `__call__` method to execute the whole collection process.
-    """
-
-    def __init__(self, cfg: EasyDict, policy, env: BaseEnvManager, random_collect_size: int = 0) -> None:
-        """
-        Arguments:
-            - cfg (:obj:`EasyDict`): Config.
-            - policy (:obj:`Policy`): The policy to be collected.
-            - env (:obj:`BaseEnvManager`): The env for the collection, the BaseEnvManager object or \
-                its derivatives are supported.
-            - random_collect_size (:obj:`int`): The count of samples that will be collected randomly, \
-                typically used in initial runs.
-        """
-        self.cfg = cfg
-        self.env = env
-        self.policy = policy
-        self.random_collect_size = random_collect_size
-        self._transitions = TransitionList(self.env.env_num)
-        self._inferencer = task.wrap(inferencer(cfg, policy, env))
-        self._rolloutor = task.wrap(rolloutor(cfg, policy, env, self._transitions))
-
-    def __call__(self, ctx: "OnlineRLContext") -> None:
-        """
-        Overview:
-            An encapsulation of inference and rollout middleware. Stop when completing the \
-                target number of episodes.
-        Input of ctx:
-            - env_episode (:obj:`int`): The env env_episode which will increase during collection.
-        """
-        old = ctx.env_episode
-        if self.random_collect_size > 0 and old < self.random_collect_size:
-            target_size = self.random_collect_size - old
-            random_policy = get_random_policy(self.cfg, self.policy, self.env)
-            current_inferencer = task.wrap(inferencer(self.cfg, random_policy, self.env))
-        else:
-            target_size = self.cfg.policy.collect.n_episode
-            current_inferencer = self._inferencer
-
-        while True:
-            current_inferencer(ctx)
-            self._rolloutor(ctx)
-            if ctx.env_episode - old >= target_size:
-                ctx.episodes = self._transitions.to_episodes()
-                self._transitions.clear()
-                break
-
-
-# TODO battle collector

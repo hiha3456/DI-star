@@ -11,13 +11,13 @@ from ding.envs import EnvSupervisor
 from ding.framework.supervisor import ChildType
 from ding.framework.context import BattleContext
 from ding.framework.middleware import StepLeagueActor, LeagueCoordinator, LeagueLearnerCommunicator, data_pusher, OffPolicyLearner
-from ding.framework.middleware.functional.collector import battle_inferencer_for_distar, battle_rolloutor_for_distar
 from ding.framework.task import task, Parallel
 from ding.league.v2 import BaseLeague
 from distar.diengine.config import distar_cfg
 from distar.diengine.envs.distar_env import DIStarEnv
 from distar.diengine.envs.fake_data import rl_step_data
 from distar.diengine.policy.distar_policy import DIStarPolicy
+from distar.diengine.middleware import DIstarBattleStepCollector, last_step_fn
 
 
 class DIstarCollectMode:
@@ -123,8 +123,7 @@ def main():
     print("League: n_players =", N_PLAYERS)
 
     with task.start(async_mode=True, ctx=BattleContext()),\
-      patch("ding.framework.middleware.collector.battle_inferencer", battle_inferencer_for_distar),\
-      patch("ding.framework.middleware.collector.battle_rolloutor", battle_rolloutor_for_distar):
+      patch("ding.framework.middleware.league_actor.BattleStepCollector", DIstarBattleStepCollector):
         print("node id:", task.router.node_id)
         if task.router.node_id == 0:
             coordinator_league = BaseLeague(cfg.policy.other.league)
@@ -141,7 +140,7 @@ def main():
             task.use(data_pusher(cfg, buffer_))
             task.use(OffPolicyLearner(cfg, policy.learn_mode, buffer_))
         else:
-            task.use(StepLeagueActor(cfg, PrepareTest.get_env_supervisor, PrepareTest.collect_policy_fn))
+            task.use(StepLeagueActor(cfg, PrepareTest.get_env_supervisor, PrepareTest.collect_policy_fn, last_step_fn))
 
         task.run()
 
