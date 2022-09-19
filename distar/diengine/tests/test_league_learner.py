@@ -25,21 +25,12 @@ from distar.ctools.utils import read_config
 def prepare_test():
     global distar_cfg
     cfg = deepcopy(distar_cfg)
-    env_cfg = read_config('./test_distar_config.yaml')
-
-    def env_fn():
-        # subprocess env manager
-        env = BaseEnvManager(
-            env_fn=[lambda: DIStarEnv(env_cfg) for _ in range(cfg.env.collector_env_num)], cfg=cfg.env.manager
-        )
-        env.seed(cfg.seed)
-        return env
 
     def policy_fn():
         policy = DIStarPolicy(DIStarPolicy.default_config(), enable_field=['learn'])
         return policy
 
-    return cfg, env_fn, policy_fn
+    return cfg, policy_fn
 
 
 def coordinator_mocker():
@@ -76,7 +67,7 @@ def actor_mocker(league):
 
 def _main():
     logging.getLogger().setLevel(logging.INFO)
-    cfg, env_fn, policy_fn = prepare_test()
+    cfg, policy_fn = prepare_test()
     league = BaseLeague(cfg.policy.other.league)
     n_players = len(league.active_players_ids)
     print("League: n_players: ", n_players)
